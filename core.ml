@@ -212,25 +212,24 @@ and typeof' isless ctx mctx t f =
       let tyT = typeofLess ctx' mctx' t x in 
       if tyeqv ctx' tyT ty then TyPi("metric_"^x, TyNat, ty)
       else (debugType ctx' tyT; pr" "; debugType ctx' ty; pr"\n"; error "[TmFun] type not match")
-      (* FIXME: 这里稍微有一点bug，不过只要ty中没用到自由变量(指n之前的)就不要紧 
-          还有，目前tyeqv里ty中TyVar的第二个参数是错的，不过反正没检查，没有关系 *)
+      (* FIXME: 这里稍微有一点bug，见notes说明 *)
 
   | TmFunApp(x, t, me) ->
       let tyMe = type_of isless ctx mctx me in
       if not (tyeqv ctx tyMe TyNat) then error "[TmFunApp] metric not Nat"
       else 
       let ty = type_of isless ctx mctx t in 
-      let res = ( match ty with 
+      let res = (match ty with 
           TyPi(_, TyNat, tyT) -> tySubstTop me tyT
         | _ -> error "[TmFunApp] arrow type expected") in
       if not isless then res
+      else if not (f = x) then res
       else let me0 = getmetric mctx f in 
       (match me0 with
         None -> error "typeof< error: [TmFunApp] metric not found"
       | Some(me0') ->
           if metricless ctx mctx me me0' then res
-          else error "typeof< error: [TmFunApp] metric doesn't descent"
-      )
+          else error "typeof< error: [TmFunApp] metric doesn't descent")
 
   | TmNil -> TyVector(TmZero)
   | TmCons(n, t1, t2) ->

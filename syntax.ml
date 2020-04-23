@@ -245,8 +245,8 @@ let rec printType ctx ty = match ty with
       if ctxlength ctx = n then
         pr (index2name ctx x)
       else
-        (print"\n["; prctx ctx; pr"]";
-        pr (string_of_int n);pr" ";pr (string_of_int (ctxlength ctx)); pr" "; 
+        (print"\n ctx:["; prctx ctx; pr"]";
+        pr ("n:" ^ string_of_int n);pr" ";pr ("ctxlen:" ^ string_of_int (ctxlength ctx)); pr" "; 
         print (string_of_bool (ctxlength ctx = n)); pr" ";
         error ("Unconsistency found when printing types! "))
   | TyApp(tyT1, t2) ->
@@ -261,7 +261,7 @@ and printTerm ctx t = match t with
       if ctxlength ctx = n then
         pr (index2name ctx x)
       else
-        (print"\nctx:["; prctx ctx; pr"]";
+        (print"\n ctx:["; prctx ctx; pr"]";
         pr ("n:" ^ string_of_int n);pr" ";pr ("ctxlen:" ^ string_of_int (ctxlength ctx)); pr" "; 
         print (string_of_bool (ctxlength ctx = n)); pr" ";
         error ("Unconsistency found when printing values! "))
@@ -320,7 +320,7 @@ let rec debugType ctx ty =
       pr " ";
       debugTerm ctx t2;
   | TyVector(n) ->
-      pr "Vector("; printTerm ctx n; pr ")"
+      pr "Vector("; debugTerm ctx n; pr ")"
 
 and debugTerm ctx t = match t with
     TmVar(x, n) ->
@@ -332,7 +332,7 @@ and debugTerm ctx t = match t with
   | TmAbs(x, tyT1, t2) -> 
     let (ctx', x') = pickfreshname ctx x in  (* 这里有将x加到ctx中！ *)
     pr "(lambda "; pr x'; pr ":"; printType ctx tyT1;
-    pr "."; printTerm ctx' t2; pr ")"
+    pr "."; debugTerm ctx' t2; pr ")"
   | TmTrue -> 
     pr "true"
   | TmFalse ->
@@ -356,7 +356,7 @@ and debugTerm ctx t = match t with
     else (pr "succ("; debugTerm ctx t1; pr ")")
   | TmPred(t1) ->
     pr "pred("; debugTerm ctx t1; pr ")"
-  | TmFun(s, me, ty, t) -> pr "s"
+  | TmFun(s, me, ty, t) -> pr ("fun "^s); debugType ctx me; debugType ctx ty; debugTerm ctx t 
   | _ -> error "Non-value encountered when printing."
 
 (* TODO: 这个print和debug还应该完善一下 *)
