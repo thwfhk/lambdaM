@@ -1,6 +1,3 @@
-(* ---------------------------------------------------------------------- *)
-(* Datatypes *)
-
 type ty = 
     TyVar of int * int
   | TyPi of string * ty * ty  
@@ -11,7 +8,7 @@ type ty =
   
 and term =
     TmVar of int * int            (* De Bruijn index, current contex length *)
-  | TmAbs of string * ty * term        (* original name, term *)
+  | TmAbs of string * ty * term   
   | TmApp of term * term
   | TmTrue
   | TmFalse
@@ -26,10 +23,10 @@ and term =
   | TmIsNil of term * term
   | TmHead of term * term
   | TmTail of term * term
-  | TmFun of  string * ty * ty * term
+  | TmFun of  string * ty list * ty * term
   | TmFunApp of string * term * metric
 
-and metric = term
+and metric = term list
 
 and kind = 
     KiStar
@@ -63,19 +60,7 @@ let rec prctx ctx = match ctx with
     [] -> ()
   | (x::xs) -> pr (fst x); pr" "; prctx xs
 
-(* ---------------------------------------------------------------------- *)
-(* Metric Context management *)
 
-let emptymctx = []
-
-let rec getmetric mctx str = 
-  match mctx with
-    [] -> None
-  | (s,t)::xs ->
-      if s=str then Some(t)
-      else getmetric xs str
-
-let addmetric mctx x me = (x,me)::mctx
 
 (* ---------------------------------------------------------------------- *)
 (* Context management *)
@@ -108,11 +93,11 @@ let rec pickfreshname ctx x =
 let index2name ctx x =
   try
     let (xn,_) = List.nth ctx x in xn
-  with Failure _ -> error "Variable lookup failure! "
+  with Failure _ -> error "[index2name] Variable lookup failure! "
 
 let rec name2index ctx x =
   match ctx with
-      [] -> error ("Identifier " ^ x ^ " is unbound! ")
+      [] -> error ("[name2index] Identifier " ^ x ^ " is unbound! ")
     | (y,_)::rest ->
         if y=x then 0
         else 1 + (name2index rest x)
@@ -120,7 +105,7 @@ let rec name2index ctx x =
 (* ---------------------------------------------------------------------- *)
 (* Shifting *)
 
-(* 对于var应用onvar(substitution或者shift)，c记录当前是第几层abs(0开始) *)
+(* c记录abstraction的层数 *)
 let rec tmmap ontmvar ontyvar c t = 
   let rec walk c t = match t with
       TmVar(x, n) -> ontmvar c x n
@@ -140,8 +125,9 @@ let rec tmmap ontmvar ontyvar c t =
     | TmHead(n, t1) -> TmHead(walk c n, walk c t1)
     | TmTail(n, t1) -> TmTail(walk c n, walk c t1)
     | TmFun(s, me, ty, t) -> 
-        TmFun(s, tymap ontmvar ontyvar c me, tymap ontmvar ontyvar (c+1) ty, walk (c+1) t)
-    | TmFunApp(s, t, me) -> TmFunApp(s, walk c t, walk c me)
+        TmFun(s, List.map (tymap ontmvar ontyvar c) me, tymap ontmvar ontyvar (c+1) ty, walk (c+1) t)
+    | TmFunApp(s, t, me) -> 
+        TmFunApp(s, walk c t, List.map (walk c) me)
   in walk c t
 
 and tymap ontmvar ontyvar c ty = 
@@ -193,19 +179,17 @@ let tySubst j s t =
 let tySubstTop s t = 
   tyShift (-1) (tySubst 0 (termShift 1 s) t)
 
-let rec shiftContext ctx = match ctx with
+let rec shiftContext ctx c = match ctx with
     [] -> []
   | (x::xs) -> let (name, bind) = x in 
       let newbind = ( match bind with
           NameBind -> NameBind
-        | VarBind(ty) -> VarBind(tyShift 1 ty)
-        | TyVarBind(ki) -> TyVarBind(ki)   (* 按理说kind中也可能有type，也是需要shift的，但是先不管了吧 *)
-      ) in (name, newbind) :: shiftContext xs
+        | VarBind(ty) -> VarBind(tyShift c ty)
+        | TyVarBind(ki) -> TyVarBind(ki)   
+        (* 按理说kind中也可能有type，也是需要shift的，但是先不管了吧 *)
+      ) in (name, newbind) :: shiftContext xs c
 
-let rec shiftMetricContext mctx = match mctx with
-    [] -> []
-  | (x::xs) -> let (name, t) = x in 
-      (name, termShift 1 t) :: shiftMetricContext xs
+
 
 
 (* ---------------------------------------------------------------------- *)
@@ -216,17 +200,17 @@ let rec getbinding ctx i =
   try
     let (_,bind) = List.nth ctx i in
     bind 
-  with Failure _ -> error "Variable lookup failure! "
+  with Failure _ -> error "[getbinding error] Variable lookup failure! "
 
 let rec getTypeFromContext ctx i =
   match getbinding ctx i with
     VarBind(ty) -> ty
-  | _ -> error "getTypeFromContext Error: Wrong kind of binding for variable "
+  | _ -> error "[getTypeFromContext error] Wrong kind of binding for variable "
 
 let rec getKindFromContext ctx i =
   match  getbinding ctx i with
     TyVarBind(ki) -> ki
-  | _ -> printctx ctx; error "getKindFromContext Error: Wrong kind of binding for variable "
+  | _ -> printctx ctx; error "[getKindFromContext error] Wrong kind of binding for variable "
 
 (* ---------------------------------------------------------------------- *)
 
@@ -248,7 +232,7 @@ let rec printType ctx ty = match ty with
         (print"\n ctx:["; prctx ctx; pr"]";
         pr ("n:" ^ string_of_int n);pr" ";pr ("ctxlen:" ^ string_of_int (ctxlength ctx)); pr" "; 
         print (string_of_bool (ctxlength ctx = n)); pr" ";
-        error ("Unconsistency found when printing types! "))
+        error ("[printType error] Unconsistency found! "))
   | TyApp(tyT1, t2) ->
       printType ctx tyT1;
       pr " ";
@@ -264,7 +248,7 @@ and printTerm ctx t = match t with
         (print"\n ctx:["; prctx ctx; pr"]";
         pr ("n:" ^ string_of_int n);pr" ";pr ("ctxlen:" ^ string_of_int (ctxlength ctx)); pr" "; 
         print (string_of_bool (ctxlength ctx = n)); pr" ";
-        error ("Unconsistency found when printing values! "))
+        error ("[printTerm error] Unconsistency found! "))
   | TmApp(t1, t2) ->
       printTerm ctx t1;
       pr " ";
@@ -291,7 +275,7 @@ and printTerm ctx t = match t with
         let rec f n t = match t with
             TmZero -> print (string_of_int n)
           | TmSucc(s) -> f (n+1) s
-          | _ -> error "succ stuck encountered when printing"
+          | _ -> error "[printTerm error] succ stuck"
         in f 0 t
       else (pr "succ("; printTerm ctx t1; pr ")")
   | TmPred(t1) ->
@@ -300,7 +284,7 @@ and printTerm ctx t = match t with
       pr "nil"
   | TmCons(n, t1, t2) ->
       pr"cons("; printTerm ctx n; pr","; printTerm ctx t1; pr","; printTerm ctx t2; pr")"
-  | _ -> error "Non-value encountered when printing."
+  | _ -> error "[printTerm error] Cases not include."
 
 
 let rec debugType ctx ty = 
@@ -356,7 +340,10 @@ and debugTerm ctx t = match t with
     else (pr "succ("; debugTerm ctx t1; pr ")")
   | TmPred(t1) ->
     pr "pred("; debugTerm ctx t1; pr ")"
-  | TmFun(s, me, ty, t) -> pr ("fun "^s); debugType ctx me; debugType ctx ty; debugTerm ctx t 
+  | TmFun(s, me, ty, t) -> 
+    pr ("fun "^s); 
+    List.fold_left (fun x -> debugType ctx) () me; 
+    debugType ctx ty; debugTerm ctx t 
   | _ -> error "Non-value encountered when printing."
 
 (* TODO: 这个print和debug还应该完善一下 *)

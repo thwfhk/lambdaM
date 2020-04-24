@@ -1,11 +1,7 @@
-(* module Core
-
-   Core typechecking and evaluation functions
-*)
+(* module typecheck:
+   functions for kinding and typing *)
 
 open Syntax
-
-val eval : context -> term -> term 
 
 (* val whnf : term -> term  *)
 val typeof : context -> metricContext -> term -> ty 

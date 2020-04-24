@@ -1,5 +1,6 @@
 open Syntax
-open Core
+open Eval
+open Typecheck
 
 let ctxlen = 0
 

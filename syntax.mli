@@ -1,4 +1,5 @@
-(* module Syntax: syntax trees and associated support functions *)
+(* module Syntax: 
+   syntax trees and associated support functions *)
 
 (* Data type definitions *)
 type ty = 
@@ -26,10 +27,10 @@ and term =
 | TmIsNil of term * term
 | TmHead of term * term
 | TmTail of term * term
-| TmFun of  string * ty * ty * term
+| TmFun of  string * ty list * ty * term
 | TmFunApp of string * term * metric
 
-and metric = term
+and metric = term list
 
 and kind = 
   KiStar
@@ -46,9 +47,6 @@ type metricContext = (string * metric) list
 
 
 (* Contexts *)
-val emptymctx : metricContext
-val getmetric : metricContext -> string -> term option
-val addmetric : metricContext -> string -> term -> metricContext
 
 val emptycontext : context 
 val ctxlength : context -> int
@@ -67,8 +65,7 @@ val termSubstTop: term -> term -> term
 val tyShift: int -> ty -> ty
 val tySubstTop: term -> ty -> ty
 
-val shiftContext: context -> context
-val shiftMetricContext: metricContext -> metricContext
+val shiftContext: context -> int -> context
 
 val getTypeFromContext: context -> int -> ty
 val getKindFromContext: context -> int -> kind
@@ -78,7 +75,7 @@ val pr: string -> unit
 val error: string -> 'a
 val prctx: context -> unit
 
-(* Printing *)
+(* Printing and Debuging *)
 
 val printType: context -> ty -> unit
 val printTerm: context -> term -> unit
