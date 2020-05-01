@@ -88,3 +88,5 @@ let metricless ctx mctx me me0 =
   in let res = List.map single_metricless (List.combine me me0) 
   (* in let () = pr (string_of_bool (List.hd res)); pr" ";pr (string_of_bool (List.hd (List.tl res))); pr"\n"  *)
   in List.fold_left (||) false res
+
+(* NOTE: 这里还不完善，比如n与5比较就做不到 *)

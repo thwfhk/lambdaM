@@ -6,6 +6,7 @@ type ty =
   TyVar of int * int
 | TyPi of string * ty * ty  
 | TyApp of ty * term
+| TySigma of string * ty * ty
 | TyBool
 | TyNat
 | TyVector of term
@@ -14,6 +15,9 @@ and term =
   TmVar of int * int            (* De Bruijn index, current contex length *)
 | TmAbs of string * ty * term        (* original name, term *)
 | TmApp of term * term
+| TmPair of term * term * ty 
+| TmProj1 of term 
+| TmProj2 of term
 | TmTrue
 | TmFalse
 | TmIf of term * term * term

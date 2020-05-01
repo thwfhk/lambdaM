@@ -28,6 +28,22 @@ let rec eval1 ctx t = match t with
       let t1' = eval1 ctx t1 in
       TmApp(t1', t2)
 
+  | TmProj1(TmPair(t1, _, _)) -> t1
+  | TmProj1(t1) -> 
+      let t1' = eval1 ctx t1 in
+      TmProj1(t1')
+  | TmProj2(TmPair(_, t2, _)) -> t2
+  | TmProj2(t1) -> 
+      let t1' = eval1 ctx t1 in
+      TmProj2(t1')
+  
+  | TmPair(v1, t2, ty) when isval ctx v1 && not (isval ctx t2) ->
+      let t2' = eval1 ctx t2 in
+      TmPair(v1, t2', ty)
+  | TmPair(t1, t2, ty) when not (isval ctx t1) ->
+      let t1' = eval1 ctx t1 in
+      TmPair(t1', t2, ty)
+
   | TmIf(TmTrue, t2, t3) ->
       t2
   | TmIf(TmFalse, t2, t3) ->

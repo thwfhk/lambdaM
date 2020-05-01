@@ -42,6 +42,22 @@ let plus =
     )
   )
 
+let notbool = 
+  TmAbs("b", TyBool, TmIf(TmVar(0, 2+ctxlen), TmFalse, TmTrue))
+
+let iseven = 
+  TmFix(
+    TmAbs("iseven", TyPi("_", TyNat, TyBool),
+      TmAbs("n", TyNat, 
+        TmIf(
+          TmIsZero(TmVar(0, 2+ctxlen)),
+          TmTrue,
+          TmApp(notbool, TmApp(TmVar(1, 2+ctxlen), TmPred(TmVar(0, 2+ctxlen))))
+        )
+      )
+    )
+  )
+
 let sum = 
   TmFix(
     TmAbs("sum",
@@ -102,6 +118,19 @@ let lenless =
 
 let test2 = TmApp(TmApp(TmApp(TmApp(lenless, three), two), 
   vec3), vec2)
+
+let foo =
+  TmAbs("d", TyNat,
+    TmIf(
+      TmIsZero(TmVar(0, 1+ctxlen)),
+      TmPair(zero, TmNil, TySigma("N", TyNat, TyVector(TmVar(0, 2+ctxlen)))),
+      TmPair(one, TmCons(zero, one, TmNil), TySigma("N", TyNat, TyVector(TmVar(0, 2+ctxlen))))
+    )
+  )
+
+let test3 = TmApp(foo, one)
+let test4 = TmProj1(TmApp(foo, one))
+
 
 
 let prty t = printType ctx (typeof ctx mctx t); pr"\n"

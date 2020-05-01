@@ -2,6 +2,7 @@ type ty =
     TyVar of int * int
   | TyPi of string * ty * ty  
   | TyApp of ty * term
+  | TySigma of string * ty * ty
   | TyBool
   | TyNat
   | TyVector of term
@@ -10,6 +11,9 @@ and term =
     TmVar of int * int            (* De Bruijn index, current contex length *)
   | TmAbs of string * ty * term   
   | TmApp of term * term
+  | TmPair of term * term * ty 
+  | TmProj1 of term 
+  | TmProj2 of term
   | TmTrue
   | TmFalse
   | TmIf of term * term * term
@@ -111,6 +115,9 @@ let rec tmmap ontmvar ontyvar c t =
       TmVar(x, n) -> ontmvar c x n
     | TmAbs(s, ty, t) -> TmAbs(s, tymap ontmvar ontyvar c ty, walk (c+1) t)
     | TmApp(t1, t2) -> TmApp(walk c t1, walk c t2)
+    | TmPair(t1, t2, s) -> TmPair(walk c t1, walk c t2, s)
+    | TmProj1(t1) -> TmProj1(walk c t1)
+    | TmProj2(t1) -> TmProj2(walk c t1)
     | TmTrue -> TmTrue
     | TmFalse -> TmFalse
     | TmIf(t1, t2, t3) -> TmIf(walk c t1, walk c t2, walk c t3)
@@ -134,6 +141,7 @@ and tymap ontmvar ontyvar c ty =
   let rec walk c t = match t with
       TyVar(x, n) -> ontyvar c x n
     | TyPi(s, ty1, ty2) -> TyPi(s, walk c ty1, walk (c+1) ty2)
+    | TySigma(s, ty1, ty2) -> TySigma(s, walk c ty1, walk (c+1) ty2)
     | TyApp(ty, t) -> TyApp(walk c ty, tmmap ontmvar ontyvar c t)
     | TyBool -> TyBool
     | TyNat -> TyNat
@@ -225,13 +233,18 @@ let rec printType ctx ty = match ty with
       let (ctx', x') = pickfreshname ctx x in
       pr"(Pi "; pr x'; pr ":"; printType ctx ty1; 
       pr "."; printType ctx' ty2; pr ")"
+  | TySigma(x, ty1, ty2) ->
+      let (ctx', x') = pickfreshname ctx x in
+      pr"(Sigma "; pr x'; pr ":"; printType ctx ty1; 
+      pr ".";
+      printType ctx' ty2; pr ")"
   | TyVar(x, n) ->
       if ctxlength ctx = n then
         pr (index2name ctx x)
       else
         (print"\n ctx:["; prctx ctx; pr"]";
         pr ("n:" ^ string_of_int n);pr" ";pr ("ctxlen:" ^ string_of_int (ctxlength ctx)); pr" "; 
-        print (string_of_bool (ctxlength ctx = n)); pr" ";
+        print (string_of_bool (ctxlength ctx = n)); pr"\n";
         error ("[printType error] Unconsistency found! "))
   | TyApp(tyT1, t2) ->
       printType ctx tyT1;
@@ -247,7 +260,7 @@ and printTerm ctx t = match t with
       else
         (print"\n ctx:["; prctx ctx; pr"]";
         pr ("n:" ^ string_of_int n);pr" ";pr ("ctxlen:" ^ string_of_int (ctxlength ctx)); pr" "; 
-        print (string_of_bool (ctxlength ctx = n)); pr" ";
+        print (string_of_bool (ctxlength ctx = n)); pr"\n";
         error ("[printTerm error] Unconsistency found! "))
   | TmApp(t1, t2) ->
       printTerm ctx t1;
@@ -283,11 +296,15 @@ and printTerm ctx t = match t with
   | TmNil -> 
       pr "nil"
   | TmCons(n, t1, t2) ->
-      pr"cons("; printTerm ctx n; pr","; printTerm ctx t1; pr","; printTerm ctx t2; pr")"
+      pr"cons("; printTerm ctx t1; pr","; printTerm ctx t2; pr")"
+  | TmPair(t1, t2, _) ->
+      pr"("; printTerm ctx t1; pr","; printTerm ctx t2; pr")"
+  | TmProj1(t) -> pr "Proj1("; printTerm ctx t; pr")"
+  | TmProj2(t) -> pr "Proj2("; printTerm ctx t; pr")"
   | _ -> error "[printTerm error] Cases not include."
 
 
-let rec debugType ctx ty = 
+and debugType ctx ty = 
   match ty with
     TyBool -> 
       pr "Bool"
@@ -296,6 +313,10 @@ let rec debugType ctx ty =
   | TyPi(x, ty1, ty2) ->
       let (ctx', x') = pickfreshname ctx x in
       pr"(Pi "; pr x'; pr ":"; debugType ctx ty1; 
+      pr "."; debugType ctx' ty2; pr ")"
+  | TySigma(x, ty1, ty2) ->
+      let (ctx', x') = pickfreshname ctx x in
+      pr"(Sigma "; pr x'; pr ":"; debugType ctx ty1; 
       pr "."; debugType ctx' ty2; pr ")"
   | TyVar(x, n) ->
       (pr "TyVar("; pr (string_of_int x); pr")")
@@ -310,12 +331,12 @@ and debugTerm ctx t = match t with
     TmVar(x, n) ->
       (pr "TmVar("; pr (string_of_int x); pr")")
   | TmApp(t1, t2) ->
-    printTerm ctx t1;
+    debugTerm ctx t1;
     pr " ";
-    printTerm ctx t2
+    debugTerm ctx t2
   | TmAbs(x, tyT1, t2) -> 
     let (ctx', x') = pickfreshname ctx x in  (* 这里有将x加到ctx中！ *)
-    pr "(lambda "; pr x'; pr ":"; printType ctx tyT1;
+    pr "(lambda "; pr x'; pr ":"; debugType ctx tyT1;
     pr "."; debugTerm ctx' t2; pr ")"
   | TmTrue -> 
     pr "true"
@@ -344,6 +365,12 @@ and debugTerm ctx t = match t with
     pr ("fun "^s); 
     List.fold_left (fun x -> debugType ctx) () me; 
     debugType ctx ty; debugTerm ctx t 
-  | _ -> error "Non-value encountered when printing."
+  | TmNil -> pr "nil"
+  | TmHead(n, t) -> pr "head("; debugTerm ctx t; pr")"
+  | TmTail(n, t) -> pr "tail("; debugTerm ctx t; pr")"
+  | TmProj1(t) -> pr "Proj1("; debugTerm ctx t; pr")"
+  | TmProj2(t) -> pr "Proj2("; debugTerm ctx t; pr")"
+  (* | _ -> error "Non-value encountered when printing." *)
+  | _ -> ()
 
 (* TODO: 这个print和debug还应该完善一下 *)

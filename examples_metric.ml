@@ -42,6 +42,22 @@ let plus =
     )
   )
 
+let notbool = 
+  TmAbs("b", TyBool, TmIf(TmVar(0, 2+ctxlen), TmFalse, TmTrue))
+
+let iseven = 
+  TmFix(
+    TmAbs("iseven", TyPi("_", TyNat, TyBool),
+      TmAbs("n", TyNat, 
+        TmIf(
+          TmIsZero(TmVar(0, 2+ctxlen)),
+          TmTrue,
+          TmApp(notbool, TmApp(TmVar(1, 2+ctxlen), TmPred(TmVar(0, 2+ctxlen))))
+        )
+      )
+    )
+  )
+
 (* calculate the sum of a vector *)
 let sum = 
   TmFun(
@@ -152,6 +168,44 @@ let lenlessR =
 
 let test2 = TmApp(TmApp(TmApp(TmApp(lenless, two), three), vec2), vec3)
 
+let evens = 
+  let n' = TmVar(0, 1+ctxlen) in
+  let n = TmVar(2, 4+ctxlen) in
+  let v = TmVar(1, 4+ctxlen) in
+  let d = TmVar(0, 4+ctxlen) in
+  let evens = TmVar(3, 4+ctxlen) in
+  TmFun(
+    "evens",
+    [TyNat],
+    TyPi("v", TyVector(n'), TyPi("d", TyNat, TySigma("m", TyNat, TyVector(TmVar(0, 4+ctxlen))))),
+    TmAbs("v", TyVector(TmVar(0, 2+ctxlen)), 
+      TmAbs("d", TyNat,
+        TmIf(
+          TmIsNil(n, v), 
+          TmPair(zero, TmNil, TySigma("m", TyNat, TyVector(TmVar(0, 5+ctxlen)))),
+          TmIf(
+            TmApp(iseven, d),
+            TmPair(
+              TmSucc(TmProj1(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d)))),
+              TmCons(
+                TmProj1(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d))),
+                TmHead(n, v),
+                TmProj2(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d)))
+              ),
+              TySigma("m", TyNat, TyVector(TmVar(0, 5+ctxlen)))
+            ),
+            TmPair(
+              TmProj1(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d))),
+              TmProj2(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d))),
+              TySigma("m", TyNat, TyVector(TmVar(0, 5+ctxlen)))
+            )
+          )
+        )
+      )
+    )
+  )
+
+let test3 = TmApp(TmApp(TmApp(evens, three), vec3), zero)
 
 let prty t = printType ctx (typeof ctx mctx t); pr"\n"
 let prtm t = printTerm ctx (eval ctx t); pr"\n"

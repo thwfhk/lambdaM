@@ -25,10 +25,15 @@ and kindof ctx tyT = match tyT with
           KiPi(_, tyT1, kiK) ->
             if tyeqv ctx tyT1 tyT2 then kiK 
             (* NOTE: should be [x->t2]kiK; not needed currently *)
-            else (printType ctx tyT1; printType ctx tyT2; 
+            else (debugType ctx tyT1; debugType ctx tyT2; 
                   error "[kindof error] parameter type not equivalence")
         | _ -> error "[kindof error] pi kind expected"
       )
+  | TySigma(x, tyT1, tyT2) ->
+      let () = kindstar ctx tyT1 in
+      let ctx' = addbinding ctx x (VarBind(tyT1)) in
+      let () = kindstar ctx' tyT2 in
+      KiStar
   | TyBool -> KiStar
   | TyNat -> KiStar
   | TyVector(t) -> KiStar
@@ -58,12 +63,37 @@ and typeof' isless ctx mctx t f =
       let tyS2 = type_of isless ctx mctx t2 in 
       (* let () = debugType ctx ty;pr"\n" in *)
       (match ty with
-          TyPi(_, tyS1, tyT) ->
-            if tyeqv ctx tyS1 tyS2 then tySubstTop t2 tyT (* [x->t2]tyT *)
+        TyPi(_, tyS1, tyT) ->
+          if tyeqv ctx tyS1 tyS2 then tySubstTop t2 tyT (* [x->t2]tyT *)
+          else 
+          (let () = printctx ctx;pr"\n";debugType ctx tyS1;pr"\n";debugType ctx tyS2;pr"\n" in 
+          error "[typeof error: TmApp] parameter type mismatch")
+      | _ -> error "[typeof error: TmApp] Pi type expected")
+
+  | TmPair(t1, t2, ty) ->
+      let () = kindstar ctx ty in
+      (match ty with
+        TySigma(_, tyT1, tyT2) ->
+          let tyT1' = type_of isless ctx mctx t1 in
+          if tyeqv ctx tyT1 tyT1' then
+            let tyT2' = type_of isless ctx mctx t2 in
+            let tyT2subst = tySubstTop t1 tyT2 in
+            if tyeqv ctx tyT2subst tyT2' then ty
             else 
-            (let () = printctx ctx;pr"\n";debugType ctx tyS1;pr"\n";debugType ctx tyS2;pr"\n" in 
-            error "[typeof error: TmApp] parameter type mismatch")
-        | _ -> error "[typeof error: TmApp] arrow type expected")
+              (debugType ctx tyT2'; pr"\n"; debugType ctx tyT2subst; pr"\n";
+              error "[typeof error: TmPair] the second element mismatch")
+          else error "[typeof error: TmPair] the first element mismatch"
+      | _ -> error "[typeof error: TmPair] Sigma type expected")
+  | TmProj1(t) ->
+      let tyT = type_of isless ctx mctx t in
+      (match tyT with
+        TySigma(_, tyT1, tyT2) -> tyT1
+      | _ -> error "[typeof error: TmProj1] Sigma type expected")
+  | TmProj2(t) ->
+      let tyT = type_of isless ctx mctx t in
+      (match tyT with
+        TySigma(_, tyT1, tyT2) -> tySubstTop (TmProj1(t)) tyT2
+      | _ -> error "[typeof error: TmProj2] Sigma type expected")
 
   | TmTrue -> 
       TyBool
@@ -72,7 +102,7 @@ and typeof' isless ctx mctx t f =
   | TmIf(t1, t2, t3) ->
       if (=) (type_of isless ctx mctx t1) TyBool then
         let tyT2 = type_of isless ctx mctx t2 in
-        if (=) tyT2 (type_of isless ctx mctx t3) then tyT2
+        if tyeqv ctx tyT2 (type_of isless ctx mctx t3) then tyT2
         else error "[typeof error: TmIf] arms of conditional have different types"
       else error "[typeof error: TmIf] guard of conditional not a boolean"
 
@@ -116,10 +146,11 @@ and typeof' isless ctx mctx t f =
       let me = generateMetric (ctxlength ctx') c in
       let mctx' = addmetric mctx x me in  
       let tyT = typeofLess ctx' mctx' t x in 
-      if tyeqv ctx' tyT ty then tyF
+      (* if tyeqv ctx' tyT ty then tyF *)
+      if tyeqvFix ctx' tyT ty c then tyF
       else (debugType ctx' tyT; pr" "; debugType ctx' ty; pr"\n"; 
             error "[typeof error: TmFun] type not match")
-      (* FIXME: 这里稍微有一点bug，见下面Fix *)
+      (* NOTE: 使用tyeqvFix的原因见下，一般不用也行 *)
 
   | TmFunApp(x, t, me) ->
       let tyMe = List.map (type_of isless ctx mctx) me in
@@ -151,7 +182,7 @@ and typeof' isless ctx mctx t f =
       then error "[typeof error: TmCons] second argument not Nat"
       else if not (tyeqv ctx tyT2 (TyVector(n))) 
       then 
-      let () = printType ctx tyT2; pr " "; printTerm ctx n in
+      let () = debugType ctx tyT2; pr " "; debugTerm ctx n in
       error "[typeof error: TmCons] Vector n mismatch"
       else TyVector(TmSucc(n))
   | TmIsNil(n, t1) ->
@@ -205,6 +236,11 @@ and tyeqv ctx ty1 ty2 =
       tyeqv ctx tyS1 tyS2 && 
       (* let () = pr"TyApp tmeqv: ";pr (string_of_bool (tmeqv ctx t1 t2));pr"\n" in *)
       tmeqv ctx t1 t2
+  | (TySigma(x, tyS1, tyS2), TySigma(_, tyT1, tyT2)) ->
+      (* let () = pr x; pr " "; pr y; pr "\n" in *)
+      tyeqv ctx tyS1 tyT1 &&
+      let ctx' = addbinding ctx x (VarBind(tyS1)) 
+      in tyeqv ctx' tyS2 tyT2
   | (TyVector(n1), TyVector(n2)) ->
       tmeqv ctx n1 n2
   | _ -> false
@@ -237,6 +273,12 @@ and tmeqv ctx tm1 tm2 =
       | (TmAbs(_, tyT1, t2), TmAbs(_, tyS1, s2)) ->
           tyeqv ctx tyT1 tyS1 && tmeqv ctx t2 s2
       | (TmVar(x1, _), TmVar(x2, _)) -> x1 = x2
+      | (TmPair(t1, t2, tyT), TmPair(s1, s2, tyS)) ->
+          tmeqv ctx t1 s1 && tmeqv ctx t2 s2 && tyeqv ctx tyT tyS 
+      | (TmProj1(t1), TmProj1(t2)) ->
+          tmeqv ctx t1 t2
+      | (TmProj2(t1), TmProj2(t2)) ->
+          tmeqv ctx t1 t2
       | _ -> v1 = v2
 
   (* NOTE: Fix后缀的是为了处理fix时lambda f:ty1.ty2的ty1和ty2比较，ty2中会多绑定一个变量(递归函数f)的情况
@@ -244,7 +286,7 @@ and tmeqv ctx tm1 tm2 =
     其实一般来说f就是ctx中的第一个变量了，所以ty1和ty2中不会有>=c的TxVar存在，用不用这个无所谓
     手动在ctx里加了些全局绑定并使用了才会需要这个 *)
 
-and tmeqvFix ctx tm1 tm2 c=    
+and tmeqvFix ctx tm1 tm2 c =    
     (* let () = (pr "tmeqv tm "; debugTerm ctx tm1; pr" "; debugTerm ctx tm2; pr"\n") in *)
     let v1 = eval ctx tm1 in
     let v2 = eval ctx tm2 in
@@ -272,6 +314,12 @@ and tmeqvFix ctx tm1 tm2 c=
       | (TmAbs(_, tyT1, t2), TmAbs(_, tyS1, s2)) ->
           tyeqvFix ctx tyT1 tyS1 c && tmeqvFix ctx t2 s2 (c+1)
       | (TmVar(x1, _), TmVar(x2, _)) -> if x1>=c then x1+1 = x2 else x1 = x2
+      | (TmPair(t1, t2, tyT), TmPair(s1, s2, tyS)) ->
+          tmeqvFix ctx t1 s1 c && tmeqvFix ctx t2 s2 c && tyeqvFix ctx tyT tyS c
+      | (TmProj1(t1), TmProj1(t2)) ->
+          tmeqvFix ctx t1 t2 c
+      | (TmProj2(t1), TmProj2(t2)) ->
+          tmeqvFix ctx t1 t2 c
       | _ -> v1 = v2
 
   
@@ -288,6 +336,10 @@ and tyeqvFix ctx ty1 ty2 c =
       in tyeqvFix ctx' tyS2 tyT2 (c+1)
   | (TyApp(tyS1, t1), TyApp(tyS2, t2)) -> 
       tyeqvFix ctx tyS1 tyS2 c && tmeqvFix ctx t1 t2 c
+  | (TySigma(x, tyS1, tyS2), TySigma(_, tyT1, tyT2)) ->
+      tyeqvFix ctx tyS1 tyT1 c &&
+      let ctx' = addbinding ctx x (VarBind(tyS1)) 
+      in tyeqvFix ctx' tyS2 tyT2 c
   | (TyVector(n1), TyVector(n2)) ->
       tmeqvFix ctx n1 n2 c
   | _ -> false
