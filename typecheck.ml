@@ -2,6 +2,8 @@ open Format
 open Syntax
 open Metric
 open Eval
+
+let global_count = ref 0
   
 let rec checkkind ctx ki = match ki with
     KiStar -> ()
@@ -49,7 +51,12 @@ and typeofLess ctx mctx t f =
   typeof' true ctx mctx t f
 
 and typeof' isless ctx mctx t f = 
-  let rec type_of isless ctx mctx t = match t with
+let rec type_of isless ctx mctx t = 
+  (* let _ = global_count := !global_count + 1 in 
+  if !global_count >= 200 then error "TOO MANY!!!!"
+  else 
+  let () = pr"type_of "; debugTerm ctx t; pr"\n"; pr"ctx ["; printctx ctx; pr"]\n" in *)
+  match t with
     TmVar(x, _) -> getTypeFromContext ctx x
   | TmAbs(x, tyS, t) ->
       let () = kindstar ctx tyS in
@@ -66,7 +73,7 @@ and typeof' isless ctx mctx t f =
         TyPi(_, tyS1, tyT) ->
           if tyeqv ctx tyS1 tyS2 then tySubstTop t2 tyT (* [x->t2]tyT *)
           else 
-          (let () = printctx ctx;pr"\n";debugType ctx tyS1;pr"\n";debugType ctx tyS2;pr"\n" in 
+          (let () = pr "ctx["; printctx ctx;pr"]\n";debugType ctx tyS1;pr"\n";debugType ctx tyS2;pr"\n" in 
           error "[typeof error: TmApp] parameter type mismatch")
       | _ -> error "[typeof error: TmApp] Pi type expected")
 
@@ -102,8 +109,10 @@ and typeof' isless ctx mctx t f =
   | TmIf(t1, t2, t3) ->
       if (=) (type_of isless ctx mctx t1) TyBool then
         let tyT2 = type_of isless ctx mctx t2 in
-        if tyeqv ctx tyT2 (type_of isless ctx mctx t3) then tyT2
-        else error "[typeof error: TmIf] arms of conditional have different types"
+        let tyT3 = type_of isless ctx mctx t3 in
+        if tyeqv ctx tyT2 tyT3 then tyT2
+        else (debugType ctx tyT2; pr" "; debugType ctx tyT3; pr"\n"; 
+              error "[typeof error: TmIf] arms of conditional have different types")
       else error "[typeof error: TmIf] guard of conditional not a boolean"
 
   | TmZero ->
@@ -153,6 +162,7 @@ and typeof' isless ctx mctx t f =
       (* NOTE: 使用tyeqvFix的原因见下，一般不用也行 *)
 
   | TmFunApp(x, t, me) ->
+      (* let () = pr "-----------TmFunApp "; debugTerm ctx t; pr"\n" in *)
       let tyMe = List.map (type_of isless ctx mctx) me in
       if not (List.fold_left (&&) true (List.map (tyeqv ctx TyNat) tyMe)) 
         then error "[typeof error: TmFunApp] metric not Nat"
@@ -182,8 +192,8 @@ and typeof' isless ctx mctx t f =
       then error "[typeof error: TmCons] second argument not Nat"
       else if not (tyeqv ctx tyT2 (TyVector(n))) 
       then 
-      let () = debugType ctx tyT2; pr " "; debugTerm ctx n in
-      error "[typeof error: TmCons] Vector n mismatch"
+        let () = debugType ctx tyT2; pr " "; debugType ctx (TyVector(n)) in
+        error "[typeof error: TmCons] Vector n mismatch"
       else TyVector(TmSucc(n))
   | TmIsNil(n, t1) ->
       let tyN = type_of isless ctx mctx n in
@@ -223,7 +233,7 @@ and kindeqv ctx ki1 ki2 = match (ki1, ki2) with
   | _ -> false
 
 and tyeqv ctx ty1 ty2 = 
-  (* let () = (pr "tyeqv "; debugType ctx ty1; pr" "; debugType ctx ty2; pr"\n") in *)
+  (* let () = (pr "tyeqv\nty1: "; debugType ctx ty1; pr"\nty2: "; debugType ctx ty2; pr"\n") in *)
   match (ty1, ty2) with
     (TyBool, TyBool) -> true
   | (TyNat, TyNat) -> true
@@ -246,11 +256,15 @@ and tyeqv ctx ty1 ty2 =
   | _ -> false
   
 and tmeqv ctx tm1 tm2 = 
-    (* let () = (pr "tmeqv tm "; debugTerm ctx tm1; pr" "; debugTerm ctx tm2; pr"\n") in *)
+    (* let () = (pr "tmeqv\ntm1: "; debugTerm ctx tm1; pr"\ntm2: "; debugTerm ctx tm2; pr"\n") in *)
+    if tm1 = tm2 then true (* NOTE: This is a trick. For there are some bugs that the tmeqv will never halt. *)
+    else 
     let v1 = eval ctx tm1 in
     let v2 = eval ctx tm2 in
     (* let () = (pr "tmeqv v "; debugTerm ctx v1; pr" "; debugTerm ctx v2; pr"\n"; pr (string_of_bool (v1 = v2)); pr"\n") in *)
-    match (v1, v2) with
+    if natcheck ctx v1 && natcheck ctx v2 then
+      nateqv ctx v1 v2
+    else match (v1, v2) with
         (TmTrue, TmTrue) -> true
       | (TmFalse, TmFalse) -> true
       | (TmIf(t1, t2, t3), TmIf(s1, s2, s3)) -> 
@@ -286,7 +300,35 @@ and tmeqv ctx tm1 tm2 =
     其实一般来说f就是ctx中的第一个变量了，所以ty1和ty2中不会有>=c的TxVar存在，用不用这个无所谓
     手动在ctx里加了些全局绑定并使用了才会需要这个 *)
 
+and natcheck ctx t = 
+  match t with
+    TmZero -> true
+  | TmVar(x, _) -> typeof ctx [] t = TyNat
+  | TmSucc(t1) -> natcheck ctx t1
+  | TmPred(t1) -> natcheck ctx t1
+  | _ -> false
+
+and nateqv ctx t1 t2 = 
+  (* let () = (pr "nateqv tm "; debugTerm ctx t1; pr" "; debugTerm ctx t2; pr"\n") in *)
+  let rec calc me cnt = match me with
+    TmVar(x,_) -> (x, cnt)
+  | TmZero -> (-1, 0)
+  | TmSucc(t) -> calc t (cnt+1)
+  | TmPred(t) -> calc t (cnt-1)
+  | _ -> (debugTerm ctx me; pr"\n"; error "[nateqv error] term not Nat")
+  in
+  let (x1, c1) = calc t1 0 in
+  let (x2, c2) = calc t2 0 in
+  if x1 != x2 then 
+    (pr "[nateqv] nat not comparable\n"; false)
+    (* (debugTerm ctx t1; pr" "; debugTerm ctx t2; pr"\n"; error "[nateqv error] nat not comparable") *)
+  else c1 = c2
+
+  (* NOTE: nateqv还么有加到Fix的里面。等着把这两个合并吧 *)
+
 and tmeqvFix ctx tm1 tm2 c =    
+    if tm1 = tm2 then true (* NOTE:This is a trick. For there are some bugs that the tmeqv will never halt. *)
+    else 
     (* let () = (pr "tmeqv tm "; debugTerm ctx tm1; pr" "; debugTerm ctx tm2; pr"\n") in *)
     let v1 = eval ctx tm1 in
     let v2 = eval ctx tm2 in

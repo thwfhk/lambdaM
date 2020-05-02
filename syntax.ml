@@ -50,7 +50,7 @@ type command =
   | Bind of string * binding
 
 (* ---------------------------------------------------------------------- *)
-(* Utilities *)
+(* print *)
 
 exception Exit
 
@@ -60,10 +60,15 @@ let print x = output_string stdout x; flush stdout
 
 let error x = pr x; pr " "; raise Exit
 
-let rec prctx ctx = match ctx with
+let rec prlist li f = match li with
     [] -> ()
-  | (x::xs) -> pr (fst x); pr" "; prctx xs
+  | (x::xs) -> f x; pr" "; prlist xs f
 
+let rec printctx ctx = 
+  match ctx with
+      [] -> ()
+    | (x,_)::rest ->
+        print x; print " "; printctx rest
 
 
 (* ---------------------------------------------------------------------- *)
@@ -76,12 +81,6 @@ let ctxlength ctx = List.length ctx
 let addbinding ctx x bind = (x,bind)::ctx (* 每次加入开头，index是0 *)
 
 let addname ctx x = addbinding ctx x NameBind
-
-let rec printctx ctx = 
-  match ctx with
-      [] -> ()
-    | (x,_)::rest ->
-        print x; print " "; printctx rest
 
 let rec isnamebound ctx x =
   match ctx with
@@ -115,7 +114,7 @@ let rec tmmap ontmvar ontyvar c t =
       TmVar(x, n) -> ontmvar c x n
     | TmAbs(s, ty, t) -> TmAbs(s, tymap ontmvar ontyvar c ty, walk (c+1) t)
     | TmApp(t1, t2) -> TmApp(walk c t1, walk c t2)
-    | TmPair(t1, t2, s) -> TmPair(walk c t1, walk c t2, s)
+    | TmPair(t1, t2, ty) -> TmPair(walk c t1, walk c t2, tymap ontmvar ontyvar c ty)
     | TmProj1(t1) -> TmProj1(walk c t1)
     | TmProj2(t1) -> TmProj2(walk c t1)
     | TmTrue -> TmTrue
@@ -132,7 +131,9 @@ let rec tmmap ontmvar ontyvar c t =
     | TmHead(n, t1) -> TmHead(walk c n, walk c t1)
     | TmTail(n, t1) -> TmTail(walk c n, walk c t1)
     | TmFun(s, me, ty, t) -> 
-        TmFun(s, List.map (tymap ontmvar ontyvar c) me, tymap ontmvar ontyvar (c+1) ty, walk (c+1) t)
+        let len = List.length me in
+        TmFun(s, List.map (tymap ontmvar ontyvar c) me, 
+              tymap ontmvar ontyvar (c+len) ty, walk (c+len+1) t)
     | TmFunApp(s, t, me) -> 
         TmFunApp(s, walk c t, List.map (walk c) me)
   in walk c t
@@ -168,7 +169,7 @@ let termSubst j s t =
 let termSubstTop s t = 
   termShift (-1) (termSubst 0 (termShift 1 s) t)
 
-(* tyShift的时候TmVar和TyVar都要管， *)
+(* tyShift的时候TmVar和TyVar都要管 *)
 let tyShiftAbove d c t =
   tymap 
     (fun c x n -> if x >= c then TmVar(x+d, n+d) else TmVar(x, n+d))
@@ -242,7 +243,7 @@ let rec printType ctx ty = match ty with
       if ctxlength ctx = n then
         pr (index2name ctx x)
       else
-        (print"\n ctx:["; prctx ctx; pr"]";
+        (print"\n ctx:["; printctx ctx; pr"]";
         pr ("n:" ^ string_of_int n);pr" ";pr ("ctxlen:" ^ string_of_int (ctxlength ctx)); pr" "; 
         print (string_of_bool (ctxlength ctx = n)); pr"\n";
         error ("[printType error] Unconsistency found! "))
@@ -258,7 +259,7 @@ and printTerm ctx t = match t with
       if ctxlength ctx = n then
         pr (index2name ctx x)
       else
-        (print"\n ctx:["; prctx ctx; pr"]";
+        (print"\n ctx:["; printctx ctx; pr"]";
         pr ("n:" ^ string_of_int n);pr" ";pr ("ctxlen:" ^ string_of_int (ctxlength ctx)); pr" "; 
         print (string_of_bool (ctxlength ctx = n)); pr"\n";
         error ("[printTerm error] Unconsistency found! "))
@@ -277,7 +278,7 @@ and printTerm ctx t = match t with
   | TmIf(t1, t2, t3) ->
       pr "if "; printTerm ctx t1; pr " then "; printTerm ctx t2; pr " else "; printTerm ctx t3
   | TmZero ->
-      pr "zero"
+      pr "0"
   | TmSucc(t1) ->
       let rec check t = match t with
           TmZero -> true
@@ -334,6 +335,10 @@ and debugTerm ctx t = match t with
     debugTerm ctx t1;
     pr " ";
     debugTerm ctx t2
+  | TmFunApp(s, t1, me) ->
+    debugTerm ctx t1;
+    pr " ";
+    pr"["; prlist me (debugTerm ctx); pr"]"
   | TmAbs(x, tyT1, t2) -> 
     let (ctx', x') = pickfreshname ctx x in  (* 这里有将x加到ctx中！ *)
     pr "(lambda "; pr x'; pr ":"; debugType ctx tyT1;
@@ -345,7 +350,11 @@ and debugTerm ctx t = match t with
   | TmIf(t1, t2, t3) ->
     pr "if "; debugTerm ctx t1; pr " then "; debugTerm ctx t2; pr " else "; debugTerm ctx t3
   | TmZero ->
-    pr "zero"
+    pr "0"
+  | TmIsZero(t1) ->
+    pr "iszero("; debugTerm ctx t1; pr")"
+  | TmIsNil(n, t1) ->
+    pr "isnil("; debugTerm ctx t1; pr")"
   | TmSucc(t1) ->
     let rec check n t = match t with
         TmZero -> true
@@ -362,15 +371,19 @@ and debugTerm ctx t = match t with
   | TmPred(t1) ->
     pr "pred("; debugTerm ctx t1; pr ")"
   | TmFun(s, me, ty, t) -> 
-    pr ("fun "^s); 
+    pr ("fun "^s^" "); 
     List.fold_left (fun x -> debugType ctx) () me; 
     debugType ctx ty; debugTerm ctx t 
   | TmNil -> pr "nil"
   | TmHead(n, t) -> pr "head("; debugTerm ctx t; pr")"
   | TmTail(n, t) -> pr "tail("; debugTerm ctx t; pr")"
+  | TmCons(n, t1, t2) ->
+      pr"cons("; debugTerm ctx t1; pr","; debugTerm ctx t2; pr")"
+  | TmPair(t1, t2, ty) ->
+      pr"pair("; debugTerm ctx t1; pr","; debugTerm ctx t2; pr":"; debugType ctx ty; pr")"
   | TmProj1(t) -> pr "Proj1("; debugTerm ctx t; pr")"
   | TmProj2(t) -> pr "Proj2("; debugTerm ctx t; pr")"
+  | TmFix(t) -> pr "Fix("; debugTerm ctx t; pr")"
   (* | _ -> error "Non-value encountered when printing." *)
-  | _ -> ()
 
 (* TODO: 这个print和debug还应该完善一下 *)

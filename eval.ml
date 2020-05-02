@@ -37,7 +37,10 @@ let rec eval1 ctx t = match t with
       let t1' = eval1 ctx t1 in
       TmProj2(t1')
   
-  | TmPair(v1, t2, ty) when isval ctx v1 && not (isval ctx t2) ->
+  | TmPair(v1, v2, ty) when isval ctx v1 && isval ctx v2 ->
+      (* pr "NO RULE APPLIES: "; debugTerm ctx t; pr"\n"; *)
+      raise NoRuleApplies
+  | TmPair(v1, t2, ty) when isval ctx v1 ->
       let t2' = eval1 ctx t2 in
       TmPair(v1, t2', ty)
   | TmPair(t1, t2, ty) when not (isval ctx t1) ->
@@ -109,6 +112,7 @@ let rec eval1 ctx t = match t with
       derivedformTmFunApp s t me
 
   | _ ->
+      (* pr "NO RULE APPLIES: "; debugTerm ctx t; pr"\n"; *)
       raise NoRuleApplies (* include TmVar *)
 
 let rec eval ctx t =

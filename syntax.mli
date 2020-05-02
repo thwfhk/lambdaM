@@ -77,7 +77,7 @@ val getKindFromContext: context -> int -> kind
 val print: string -> unit
 val pr: string -> unit
 val error: string -> 'a
-val prctx: context -> unit
+val prlist: 'a list -> ('a -> unit) -> unit
 
 (* Printing and Debuging *)
 

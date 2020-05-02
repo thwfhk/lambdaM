@@ -5,3 +5,4 @@ open Syntax
 open Metric
 
 val eval : context -> term -> term 
+(* val metricless : context -> metricContext -> metric -> metric -> bool *)

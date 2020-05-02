@@ -1,6 +1,7 @@
 open Syntax
 open Eval
 open Typecheck
+open Metric
 
 let ctxlen = 0
 let ctx = []
@@ -24,8 +25,9 @@ let mkthree =
     )
   )
 
-let vec3 = TmApp(TmApp(TmApp(mkthree, one), two), three)
-let vec2 = TmCons(one, one, TmCons(zero, two, TmNil))
+let vec3 = TmApp(TmApp(TmApp(mkthree, one), two), three) (* [1;2;3] *)
+let vec2 = TmCons(one, one, TmCons(zero, two, TmNil))  (* [1;2] *)
+let vec1 = TmCons(one, one, TmNil)  (* [1;2] *)
 
 let plus = 
   TmFix(
@@ -168,6 +170,7 @@ let lenlessR =
 
 let test2 = TmApp(TmApp(TmApp(TmApp(lenless, two), three), vec2), vec3)
 
+(* return the elements in even positions of a list *)
 let evens = 
   let n' = TmVar(0, 1+ctxlen) in
   let n = TmVar(2, 4+ctxlen) in
@@ -186,17 +189,17 @@ let evens =
           TmIf(
             TmApp(iseven, d),
             TmPair(
-              TmSucc(TmProj1(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d)))),
+              TmSucc(TmProj1(TmApp(TmApp(TmFunApp("evens", evens, [TmPred(n)]), TmTail(n, v)), TmSucc(d)))),
               TmCons(
-                TmProj1(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d))),
+                TmProj1(TmApp(TmApp(TmFunApp("evens", evens, [TmPred(n)]), TmTail(n, v)), TmSucc(d))),
                 TmHead(n, v),
-                TmProj2(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d)))
+                TmProj2(TmApp(TmApp(TmFunApp("evens", evens, [TmPred(n)]), TmTail(n, v)), TmSucc(d)))
               ),
               TySigma("m", TyNat, TyVector(TmVar(0, 5+ctxlen)))
             ),
             TmPair(
-              TmProj1(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d))),
-              TmProj2(TmApp(TmApp(TmApp(evens, TmPred(n)), TmTail(n, v)), TmSucc(d))),
+              TmProj1(TmApp(TmApp(TmFunApp("evens", evens, [TmPred(n)]), TmTail(n, v)), TmSucc(d))),
+              TmProj2(TmApp(TmApp(TmFunApp("evens", evens, [TmPred(n)]), TmTail(n, v)), TmSucc(d))),
               TySigma("m", TyNat, TyVector(TmVar(0, 5+ctxlen)))
             )
           )
@@ -207,5 +210,208 @@ let evens =
 
 let test3 = TmApp(TmApp(TmApp(evens, three), vec3), zero)
 
+(* let mt = 
+  let mt = TmVar(2, 3+ctxlen) in
+  let n = TmVar(1, 3+ctxlen) in
+  let v = TmVar(0, 3+ctxlen) in
+  TmFun(
+    "mt",
+    [TyNat],
+    TyPi("v", TyVector(TmVar(0, 1+ctxlen)), TyBool),
+    TmAbs("v", TyVector(TmVar(0, 2+ctxlen)), 
+      TmIf(
+        TmIsNil(n, v),
+        TmTrue,
+        TmApp(
+          TmFunApp("mt", mt, [TmProj1(TmApp(TmApp(TmFunApp("evens", evens, [n]), v), zero))]),
+          TmProj2(TmApp(TmApp(TmFunApp("evens", evens, [n]), v), zero))
+        )
+      )   
+    )
+  ) *)
+
+
+let snoc = 
+  let x = TmVar(0, 4+ctxlen) in
+  let v = TmVar(1, 4+ctxlen) in
+  let n = TmVar(2, 4+ctxlen) in
+  let snoc' = TmVar(3, 4+ctxlen) in
+  TmFun(
+    "snoc",
+    [TyNat],
+    TyPi("v", TyVector(TmVar(0, 1+ctxlen)), TyPi("x", TyNat, TyVector(TmSucc(TmVar(2, 3+ctxlen))))),
+    TmAbs("v", TyVector(TmVar(0, 2+ctxlen)),
+      TmAbs("x", TyNat,
+        TmIf(
+          TmIsNil(n, v),
+          TmCons(n, x, v),
+          TmCons(n, TmHead(n, v), TmApp(TmApp(TmFunApp("snoc", snoc', [TmPred(n)]), TmTail(n, v)), x))
+        )
+      )
+    )
+  )
+
+let test4 = TmApp(TmApp(TmFunApp("snoc", snoc, [three]), vec3), TmHead(two, vec2))
+
+let append = 
+  let v2 = TmVar(0, 5+ctxlen) in
+  let v1 = TmVar(1, 5+ctxlen) in
+  let n1 = TmVar(2, 5+ctxlen) in
+  let n2 = TmVar(3, 5+ctxlen) in
+  let append' = TmVar(4, 5+ctxlen) in
+  TmFun(
+    "append",
+    [TyNat],
+    TyPi("n1", TyNat, 
+      TyPi("v1", TyVector(TmVar(0, 2+ctxlen)), 
+        TyPi("v2", TyVector(TmVar(2, 3+ctxlen)), 
+          TySigma(
+            "m",
+            TyNat,
+            TyVector(TmVar(0, 5+ctxlen))
+          )
+        )
+      )
+    ),
+    TmAbs("n1", TyNat,
+      TmAbs("v1", TyVector(TmVar(0, 3+ctxlen)),
+        TmAbs("v2", TyVector(TmVar(2, 4+ctxlen)),
+          TmIf(
+            TmIsNil(n2, v2),
+            TmPair(n1, v1, TySigma("m", TyNat, TyVector(TmVar(0, 6+ctxlen)))),
+            TmPair(
+              TmProj1(
+                TmApp(TmApp(TmApp(TmFunApp("append", append', [TmPred(n2)]), 
+                  TmSucc(n1)), 
+                  TmApp(TmApp(TmFunApp("snoc", snoc, [n1]), v1), TmHead(n2, v2))),
+                  TmTail(n2, v2)
+                )
+              ),
+              TmProj2(
+                TmApp(TmApp(TmApp(TmFunApp("append", append', [TmPred(n2)]), 
+                  TmSucc(n1)), 
+                  TmApp(TmApp(TmFunApp("snoc", snoc, [n1]), v1), TmHead(n2, v2))),
+                  TmTail(n2, v2)
+                )
+              ),
+              TySigma("m", TyNat, TyVector(TmVar(0, 6+ctxlen)))
+            )
+          )
+        )
+      )
+    )
+  )
+
+let test5 = TmApp(TmApp(TmApp(TmApp(append, two), three), vec3), vec2)
+
+let less2 = 
+  let n = TmVar(0, 1+ctxlen) in
+  TmAbs("n", TyNat,
+    TmIf(
+      TmIsZero(n),
+      TmTrue,
+      TmIf(
+        TmIsZero(TmPred(n)),
+        TmTrue,
+        TmFalse
+      )
+    )
+  )
+
+let f = 
+  let v2 = TmVar(0, 5+ctxlen) in
+  let v1 = TmVar(1, 5+ctxlen) in
+  let n2 = TmVar(2, 5+ctxlen) in
+  let n1 = TmVar(3, 5+ctxlen) in
+  let f = TmVar(4, 5+ctxlen) in
+  TmFun(
+    "f",
+    [TyNat; TyNat],
+    TyPi("v1", TyVector(TmVar(1, 2+ctxlen)), 
+      TyPi("v2", TyVector(TmVar(1, 3+ctxlen)), 
+        TySigma("m", TyNat, TyVector(TmVar(0, 5+ctxlen)))
+      )
+    ),
+    TmAbs("v1", TyVector(TmVar(1, 3+ctxlen)),
+      TmAbs("v2", TyVector(TmVar(1, 4+ctxlen)),
+        TmIf(
+          TmApp(less2, n1),
+          TmIf(
+            TmApp(less2, n2),
+            TmPair(
+              TmProj1(TmApp(TmApp(TmApp(TmFunApp("append", append, [n1]), n2), v1), v2)), 
+              TmProj2(TmApp(TmApp(TmApp(TmFunApp("append", append, [n1]), n2), v1), v2)),
+              TySigma("m", TyNat, TyVector(TmVar(0, 6+ctxlen)))
+            ),
+            TmApp(TmApp(TmApp(TmFunApp("append", append, 
+              [TmProj1(
+                TmApp(TmApp(TmFunApp("f", f, 
+                  [TmSucc(n1); TmPred(TmPred(n2))]),
+                  TmCons(n1, zero, v1)),
+                  TmTail(TmPred(n2), TmTail(n2, v2)))
+              )]),
+              n1),
+              v1),
+              TmProj2(
+                TmApp(TmApp(TmFunApp("f", f, 
+                  [TmSucc(n1); TmPred(TmPred(n2))]),
+                  TmCons(n1, zero, v1)),
+                  TmTail(TmPred(n2), TmTail(n2, v2)))
+              )
+            )
+          ),
+          TmIf(
+            TmApp(less2, n2),
+            TmApp(TmApp(TmApp(TmFunApp("append", append, 
+              [n2]),
+              TmProj1(
+                TmApp(TmApp(TmFunApp("f", f, 
+                  [TmPred(TmPred(n1)); TmSucc(n2)]),
+                  TmTail(TmPred(n1), TmTail(n1, v1))),
+                  TmCons(n2, zero, v2))
+              )),
+              TmProj2(
+                TmApp(TmApp(TmFunApp("f", f, 
+                  [TmPred(TmPred(n1)); TmSucc(n2)]),
+                  TmTail(TmPred(n1), TmTail(n1, v1))),
+                  TmCons(n2, zero, v2))
+              )),
+              v2
+            ),
+            TmApp(TmApp(TmApp(TmFunApp("append", append, 
+              [TmProj1(
+                TmApp(TmApp(TmFunApp("f", f, 
+                  [TmSucc(n1); TmPred(TmPred(n2))]),
+                  TmCons(n1, zero, v1)),
+                  TmTail(TmPred(n2), TmTail(n2, v2)))
+              )]),
+              TmProj1(
+                TmApp(TmApp(TmFunApp("f", f, 
+                  [TmPred(TmPred(n1)); TmSucc(n2)]),
+                  TmTail(TmPred(n1), TmTail(n1, v1))),
+                  TmCons(n2, zero, v2))
+              )),
+              TmProj2(
+                TmApp(TmApp(TmFunApp("f", f, 
+                  [TmPred(TmPred(n1)); TmSucc(n2)]),
+                  TmTail(TmPred(n1), TmTail(n1, v1))),
+                  TmCons(n2, zero, v2))
+              )),
+              TmProj2(
+                TmApp(TmApp(TmFunApp("f", f, 
+                  [TmSucc(n1); TmPred(TmPred(n2))]),
+                  TmCons(n1, zero, v1)),
+                  TmTail(TmPred(n2), TmTail(n2, v2)))
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+
+let test6 = TmApp(TmApp(TmFunApp("f", f, [three; three]), vec3), vec3)
+
 let prty t = printType ctx (typeof ctx mctx t); pr"\n"
 let prtm t = printTerm ctx (eval ctx t); pr"\n"
+let detm t = debugTerm ctx (eval ctx (eval ctx t)); pr"\n"

@@ -70,7 +70,7 @@ let derivedformTmFunApp s t me =
 
 (* comparison of metrics  *)
 
-let metricless ctx mctx me me0 =
+let metricless_lexicographical ctx mctx me me0 =
   if List.length me != List.length me0 
     then error "[metricless error] metric length not equal"
   else 
@@ -89,4 +89,25 @@ let metricless ctx mctx me me0 =
   (* in let () = pr (string_of_bool (List.hd res)); pr" ";pr (string_of_bool (List.hd (List.tl res))); pr"\n"  *)
   in List.fold_left (||) false res
 
-(* NOTE: 这里还不完善，比如n与5比较就做不到 *)
+let metricless_sum ctx mctx me me0 =
+  if List.length me != List.length me0 
+    then error "[metricless error] metric length not equal"
+  else 
+  let single_metricless (m1, m2) = 
+    let rec calc me cnt = match me with
+        TmVar(x,_) -> (x, cnt)
+      | TmSucc(t) -> calc t (cnt+1)
+      | TmPred(t) -> calc t (cnt-1)
+      | _ -> (debugTerm ctx me; pr"\n"; error "[metricless error] metric not Nat")
+    in 
+    let (x1, c1) = calc m1 0 in
+    let (x2, c2) = calc m2 0 in
+    if x1 != x2 then error "[metricless error] metric not comparable"
+    else c1 - c2
+  in let res = List.map single_metricless (List.combine me me0) 
+  (* in let () = pr (string_of_bool (List.hd res)); pr" ";pr (string_of_bool (List.hd (List.tl res))); pr"\n"  *)
+  in List.fold_left (+) 0 res < 0
+
+let metricless = metricless_sum
+
+(* NOTE: n与5是不可比的 *)
