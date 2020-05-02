@@ -1,4 +1,5 @@
 open Syntax
+open Print
 open Eval
 open Typecheck
 

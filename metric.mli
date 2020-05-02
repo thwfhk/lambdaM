@@ -1,6 +1,7 @@
-(* module Core:
+(* module Metric:
    support functions for metric and metric context *)
 open Syntax
+open Print
 
 val emptymctx : metricContext
 val getmetric : metricContext -> string -> metric option

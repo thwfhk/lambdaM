@@ -1,4 +1,5 @@
 open Syntax
+open Print
 open Eval
 open Typecheck
 open Metric
@@ -7,28 +8,51 @@ let ctxlen = 0
 let ctx = []
 let mctx = []
 
+
+(* --------------- bool --------------- *)
+
+(* not operator for bool *)
+let notbool = 
+  TmAbs("b", TyBool, TmIf(TmVar(0, 2+ctxlen), TmFalse, TmTrue))
+
+
+(* --------------- natural number --------------- *)
+
 let zero = TmZero
 let one = TmSucc(TmZero)
 let two = TmSucc(one)
 let three = TmSucc(two)
 
-let mkthree =
-  TmAbs("z", TyNat,
-    TmAbs("y", TyNat,
-      TmAbs("x", TyNat,
-        TmCons(two, TmVar(2, 3+ctxlen),
-          TmCons(one, TmVar(1, 3+ctxlen),
-            TmCons(zero, TmVar(0, 3+ctxlen), TmNil)
-          )
+(* check if a number is even *)
+let iseven = 
+  TmFix(
+    TmAbs("iseven", TyPi("_", TyNat, TyBool),
+      TmAbs("n", TyNat, 
+        TmIf(
+          TmIsZero(TmVar(0, 2+ctxlen)),
+          TmTrue,
+          TmApp(notbool, TmApp(TmVar(1, 2+ctxlen), TmPred(TmVar(0, 2+ctxlen))))
         )
       )
     )
   )
 
-let vec3 = TmApp(TmApp(TmApp(mkthree, one), two), three) (* [1;2;3] *)
-let vec2 = TmCons(one, one, TmCons(zero, two, TmNil))  (* [1;2] *)
-let vec1 = TmCons(one, one, TmNil)  (* [1;2] *)
+(* check if a number is less than 2 *)
+let less2 = 
+  let n = TmVar(0, 1+ctxlen) in
+  TmAbs("n", TyNat,
+    TmIf(
+      TmIsZero(n),
+      TmTrue,
+      TmIf(
+        TmIsZero(TmPred(n)),
+        TmTrue,
+        TmFalse
+      )
+    )
+  )
 
+(* plus two numbers *)
 let plus = 
   TmFix(
     TmAbs("plus", TyPi("X", TyNat, TyPi("Y", TyNat, TyNat)),
@@ -44,23 +68,30 @@ let plus =
     )
   )
 
-let notbool = 
-  TmAbs("b", TyBool, TmIf(TmVar(0, 2+ctxlen), TmFalse, TmTrue))
 
-let iseven = 
-  TmFix(
-    TmAbs("iseven", TyPi("_", TyNat, TyBool),
-      TmAbs("n", TyNat, 
-        TmIf(
-          TmIsZero(TmVar(0, 2+ctxlen)),
-          TmTrue,
-          TmApp(notbool, TmApp(TmVar(1, 2+ctxlen), TmPred(TmVar(0, 2+ctxlen))))
+(* --------------- vector --------------- *)
+
+(* make a three length vector *)
+let mkthree =
+  TmAbs("z", TyNat,
+    TmAbs("y", TyNat,
+      TmAbs("x", TyNat,
+        TmCons(two, TmVar(2, 3+ctxlen),
+          TmCons(one, TmVar(1, 3+ctxlen),
+            TmCons(zero, TmVar(0, 3+ctxlen), TmNil)
+          )
         )
       )
     )
   )
 
-(* calculate the sum of a vector *)
+let vec1 = TmCons(one, one, TmNil)  (* [1;2] *)
+let vec2 = TmCons(one, one, TmCons(zero, two, TmNil))  (* [1;2] *)
+let vec3 = TmApp(TmApp(TmApp(mkthree, one), two), three) (* [1;2;3] *)
+
+(* --------------- some recursive functions with metric --------------- *)
+
+(* [Recursive Function 1] calculate the sum of a vector *)
 let sum = 
   TmFun(
     "sum",
@@ -84,7 +115,7 @@ let sum =
     )
   )
 
-(* a wrong sum which loops forever *)
+(* a wrong version of sum which loops forever *)
 let sumR = 
   TmFun(
     "sumR",
@@ -108,9 +139,9 @@ let sumR =
     )
   )
 
-let test1 = TmApp(TmApp(sum, three), vec3)
 
-(* compare the length of two vectors using recursion *)
+
+(* [Recursive Function 2] compare the length of two vectors using recursion *)
 let lenless = 
   let n1'  = TmVar(1, 2+ctxlen) in
   let n2'  = TmVar(1, 3+ctxlen) in
@@ -139,7 +170,7 @@ let lenless =
     ))
   )
 
-(* a wrong lenless which loops forever *)
+(* a wrong version of lenless which loops forever *)
 let lenlessR = 
   let n1'  = TmVar(1, 2+ctxlen) in
   let n2'  = TmVar(1, 3+ctxlen) in
@@ -168,9 +199,9 @@ let lenlessR =
     ))
   )
 
-let test2 = TmApp(TmApp(TmApp(TmApp(lenless, two), three), vec2), vec3)
 
-(* return the elements in even positions of a list *)
+
+(* [Recursive Function 3] return the elements in even positions of a list *)
 let evens = 
   let n' = TmVar(0, 1+ctxlen) in
   let n = TmVar(2, 4+ctxlen) in
@@ -208,29 +239,9 @@ let evens =
     )
   )
 
-let test3 = TmApp(TmApp(TmApp(evens, three), vec3), zero)
-
-(* let mt = 
-  let mt = TmVar(2, 3+ctxlen) in
-  let n = TmVar(1, 3+ctxlen) in
-  let v = TmVar(0, 3+ctxlen) in
-  TmFun(
-    "mt",
-    [TyNat],
-    TyPi("v", TyVector(TmVar(0, 1+ctxlen)), TyBool),
-    TmAbs("v", TyVector(TmVar(0, 2+ctxlen)), 
-      TmIf(
-        TmIsNil(n, v),
-        TmTrue,
-        TmApp(
-          TmFunApp("mt", mt, [TmProj1(TmApp(TmApp(TmFunApp("evens", evens, [n]), v), zero))]),
-          TmProj2(TmApp(TmApp(TmFunApp("evens", evens, [n]), v), zero))
-        )
-      )   
-    )
-  ) *)
 
 
+(* [Recursive Function 4] concatenate an element to the tail of a vector *)
 let snoc = 
   let x = TmVar(0, 4+ctxlen) in
   let v = TmVar(1, 4+ctxlen) in
@@ -251,8 +262,9 @@ let snoc =
     )
   )
 
-let test4 = TmApp(TmApp(TmFunApp("snoc", snoc, [three]), vec3), TmHead(two, vec2))
 
+
+(* Recursive Function 5] concatenate two vectors *)
 let append = 
   let v2 = TmVar(0, 5+ctxlen) in
   let v1 = TmVar(1, 5+ctxlen) in
@@ -302,22 +314,9 @@ let append =
     )
   )
 
-let test5 = TmApp(TmApp(TmApp(TmApp(append, two), three), vec3), vec2)
 
-let less2 = 
-  let n = TmVar(0, 1+ctxlen) in
-  TmAbs("n", TyNat,
-    TmIf(
-      TmIsZero(n),
-      TmTrue,
-      TmIf(
-        TmIsZero(TmPred(n)),
-        TmTrue,
-        TmFalse
-      )
-    )
-  )
 
+(* [Recursive Function 6] calculate the f function *)
 let f = 
   let v2 = TmVar(0, 5+ctxlen) in
   let v1 = TmVar(1, 5+ctxlen) in
@@ -339,8 +338,8 @@ let f =
           TmIf(
             TmApp(less2, n2),
             TmPair(
-              TmProj1(TmApp(TmApp(TmApp(TmFunApp("append", append, [n1]), n2), v1), v2)), 
-              TmProj2(TmApp(TmApp(TmApp(TmFunApp("append", append, [n1]), n2), v1), v2)),
+              TmProj1(TmApp(TmApp(TmApp(TmFunApp("append", append, [n2]), n1), v1), v2)), 
+              TmProj2(TmApp(TmApp(TmApp(TmFunApp("append", append, [n2]), n1), v1), v2)),
               TySigma("m", TyNat, TyVector(TmVar(0, 6+ctxlen)))
             ),
             TmApp(TmApp(TmApp(TmFunApp("append", append, 
@@ -410,7 +409,24 @@ let f =
     )
   )
 
+
+(* --------------- test --------------- *)
+
+(* test sum *)
+let test1 = TmApp(TmApp(sum, three), vec3)
+(* test lenless *)
+let test2 = TmApp(TmApp(TmApp(TmApp(lenless, two), three), vec2), vec3)
+(* test even *)
+let test3 = TmApp(TmApp(TmApp(evens, three), vec3), zero)
+(* test snoc *)
+let test4 = TmApp(TmApp(TmFunApp("snoc", snoc, [three]), vec3), TmHead(two, vec2))
+(* test append *)
+let test5 = TmApp(TmApp(TmApp(TmApp(append, two), three), vec3), vec2)
+(* test f *)
 let test6 = TmApp(TmApp(TmFunApp("f", f, [three; three]), vec3), vec3)
+
+
+(* --------------- utilities for printing --------------- *)
 
 let prty t = printType ctx (typeof ctx mctx t); pr"\n"
 let prtm t = printTerm ctx (eval ctx t); pr"\n"

@@ -1,4 +1,5 @@
 #load "syntax.cmo"
+#load "print.cmo"
 #load "metric.cmo"
 #load "eval.cmo"
 #load "typecheck.cmo"

@@ -1,45 +1,93 @@
-buf.cmo : \
+eval.cmo : \
     syntax.cmi \
-    parser.cmi \
-    lexer.cmo \
-    core.cmi
-buf.cmx : \
+    print.cmi \
+    metric.cmi \
+    eval.cmi
+eval.cmx : \
     syntax.cmx \
-    parser.cmx \
-    lexer.cmx \
-    core.cmx
-core.cmo : \
+    print.cmx \
+    metric.cmx \
+    eval.cmi
+eval.cmi : \
     syntax.cmi \
-    core.cmi
-core.cmx : \
-    syntax.cmx \
-    core.cmi
-core.cmi : \
-    syntax.cmi
-lexer.cmo : \
-    parser.cmi
-lexer.cmx : \
-    parser.cmx
-main.cmo : \
+    print.cmi \
+    metric.cmi
+examples.cmo : \
+    typecheck.cmi \
     syntax.cmi \
-    parser.cmi \
-    lexer.cmo \
-    core.cmi
-main.cmx : \
+    print.cmi \
+    eval.cmi
+examples.cmx : \
+    typecheck.cmx \
     syntax.cmx \
-    parser.cmx \
-    lexer.cmx \
-    core.cmx
-parser.cmo : \
+    print.cmx \
+    eval.cmx
+examples_metric.cmo : \
+    typecheck.cmi \
     syntax.cmi \
-    parser.cmi
-parser.cmx : \
+    print.cmi \
+    metric.cmi \
+    eval.cmi
+examples_metric.cmx : \
+    typecheck.cmx \
     syntax.cmx \
-    parser.cmi
-parser.cmi : \
+    print.cmx \
+    metric.cmx \
+    eval.cmx
+examples_nat.cmo : \
+    typecheck.cmi \
+    syntax.cmi \
+    eval.cmi
+examples_nat.cmx : \
+    typecheck.cmx \
+    syntax.cmx \
+    eval.cmx
+examples_vector.cmo : \
+    typecheck.cmi \
+    syntax.cmi \
+    eval.cmi
+examples_vector.cmx : \
+    typecheck.cmx \
+    syntax.cmx \
+    eval.cmx
+init.cmo :
+init.cmx :
+metric.cmo : \
+    syntax.cmi \
+    print.cmi \
+    metric.cmi
+metric.cmx : \
+    syntax.cmx \
+    print.cmx \
+    metric.cmi
+metric.cmi : \
+    syntax.cmi \
+    print.cmi
+print.cmo : \
+    syntax.cmi \
+    print.cmi
+print.cmx : \
+    syntax.cmx \
+    print.cmi
+print.cmi : \
     syntax.cmi
 syntax.cmo : \
     syntax.cmi
 syntax.cmx : \
     syntax.cmi
 syntax.cmi :
+typecheck.cmo : \
+    syntax.cmi \
+    print.cmi \
+    metric.cmi \
+    eval.cmi \
+    typecheck.cmi
+typecheck.cmx : \
+    syntax.cmx \
+    print.cmx \
+    metric.cmx \
+    eval.cmx \
+    typecheck.cmi
+typecheck.cmi : \
+    syntax.cmi \
+    print.cmi

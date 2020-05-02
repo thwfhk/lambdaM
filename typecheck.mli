@@ -1,7 +1,8 @@
-(* module typecheck:
+(* module Typecheck:
    functions for kinding and typing *)
 
 open Syntax
+open Print
 
 (* val whnf : term -> term  *)
 val typeof : context -> metricContext -> term -> ty 

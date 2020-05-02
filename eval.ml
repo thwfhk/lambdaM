@@ -1,4 +1,5 @@
 open Syntax
+open Print
 open Metric
 
 let rec isnumericval ctx t = match t with
@@ -14,6 +15,8 @@ let rec isval ctx t = match t with
   | TmCons(n, t1, t2) -> 
       isnumericval ctx n && isnumericval ctx t1 && isval ctx t2
   | TmAbs(_,_,_) -> true
+  | TmPair(t1, t2, _) ->
+      isval ctx t1 && isval ctx t2
   | _ -> false
 
 exception NoRuleApplies

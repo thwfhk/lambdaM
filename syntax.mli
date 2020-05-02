@@ -61,9 +61,11 @@ val getbinding : context -> int -> binding
 val name2index : context -> string -> int
 val isnamebound : context -> string -> bool
 val printctx : context -> unit
+val pickfreshname : context -> string -> context * string
 
 
 (* Shifting and substitution *)
+
 val termShift: int -> term -> term
 val termSubstTop: term -> term -> term
 val tyShift: int -> ty -> ty
@@ -78,12 +80,5 @@ val print: string -> unit
 val pr: string -> unit
 val error: string -> 'a
 val prlist: 'a list -> ('a -> unit) -> unit
-
-(* Printing and Debuging *)
-
-val printType: context -> ty -> unit
-val printTerm: context -> term -> unit
-val debugType: context -> ty -> unit
-val debugTerm: context -> term -> unit
 
 

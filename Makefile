@@ -1,13 +1,13 @@
-OBJS = syntax.cmo lexer.cmo parser.cmo core.cmo main.cmo
+OBJS = syntax.cmo print.cmo metric.cmo eval.cmo typecheck.cmo
 
-all: $(OBJS) f
+all: $(OBJS)
 
 include .depend
 
 # Build an executable typechecker
-f: $(OBJS) main.cmo 
-	@echo Linking $@
-	ocamlc -o $@ $(OBJS) 
+# f: $(OBJS) main.cmo 
+# 	@echo Linking $@
+# 	ocamlc -o $@ $(OBJS) 
 
 # Compile an ML module interface
 %.cmi : %.mli
@@ -17,20 +17,10 @@ f: $(OBJS) main.cmo
 %.cmo : %.ml
 	ocamlc -c $<
 
-# Generate ML files from a parser definition file
-parser.ml parser.mli: parser.mly
-	@rm -f $@
-	ocamlyacc $<
-
-# Generate ML files from a lexer definition file
-lexer.ml lexer.mli: lexer.mll
-	@rm -f $@
-	ocamllex $<
-
 # Clean up the directory
 clean::
-	rm -rf lexer.ml parser.ml parser.mli *.cm[io] f
+	rm -rf *.cm[io] 
 
 # Rebuild intermodule dependencies
-depend:: lexer.ml parser.ml
+depend:: 
 	ocamldep *.mli *.ml > .depend

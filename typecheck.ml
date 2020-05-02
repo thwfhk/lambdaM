@@ -1,5 +1,5 @@
-open Format
 open Syntax
+open Print
 open Metric
 open Eval
 
