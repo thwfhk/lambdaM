@@ -433,6 +433,8 @@ let test6 = TmApp(TmApp(TmFunApp("f", f, [three; three]), vec3), vec3)
 
 (* --------------- utilities for printing --------------- *)
 
-let prty t = printType ctx (typeof ctx mctx t); pr"\n"
+let prty t = 
+  let () = printType ctx (typeof ctx mctx t); pr"\n" in
+  pr "The term passed the type checking and termination checking.\n"
 let prtm t = printTerm ctx (eval ctx t); pr"\n"
 let detm t = debugTerm ctx (eval ctx (eval ctx t)); pr"\n"
