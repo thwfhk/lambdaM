@@ -414,14 +414,19 @@ let f =
 
 (* test sum *)
 let test1 = TmApp(TmApp(sum, three), vec3)
+
 (* test lenless *)
 let test2 = TmApp(TmApp(TmApp(TmApp(lenless, two), three), vec2), vec3)
+
 (* test even *)
 let test3 = TmApp(TmApp(TmApp(evens, three), vec3), zero)
+
 (* test snoc *)
 let test4 = TmApp(TmApp(TmFunApp("snoc", snoc, [three]), vec3), TmHead(two, vec2))
+
 (* test append *)
 let test5 = TmApp(TmApp(TmApp(TmApp(append, two), three), vec3), vec2)
+
 (* test f *)
 let test6 = TmApp(TmApp(TmFunApp("f", f, [three; three]), vec3), vec3)
 

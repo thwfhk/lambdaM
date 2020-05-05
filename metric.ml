@@ -110,5 +110,3 @@ let metricless_sum ctx mctx me me0 =
   in List.fold_left (+) 0 res < 0
 
 let metricless = metricless_sum
-
-(* NOTE: n与5是不可比的 *)

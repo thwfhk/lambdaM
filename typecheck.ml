@@ -5,6 +5,9 @@ open Eval
 
 let global_count = ref 0
   
+(* --------------------------------------------------------------------------- *)
+(* kinding *)
+
 let rec checkkind ctx ki = match ki with
     KiStar -> ()
   | KiPi(x, tyT, ki') -> 
@@ -43,6 +46,9 @@ and kindof ctx tyT = match tyT with
 and kindstar ctx tyT = 
   if kindof ctx tyT = KiStar then ()
   else error "[kindstar error] kind not equal to KiStar"
+
+(* --------------------------------------------------------------------------- *)
+(* typing *)
 
 and typeof ctx mctx t = 
   typeof' false ctx mctx t "dummy"(* dummy f *)
@@ -224,81 +230,20 @@ let rec type_of isless ctx mctx t =
       else TyVector(TmPred(n))
   in type_of isless ctx mctx t
 
-and kindeqv ctx ki1 ki2 = match (ki1, ki2) with
+(* --------------------------------------------------------------------------- *)
+(* equivalence checking *)
+
+(* and kindeqv ctx ki1 ki2 = match (ki1, ki2) with
     (KiStar, KiStar) -> true
   | (KiPi(x, tyT1, kiK1), KiPi(_, tyT2, kiK2)) ->
       tyeqv ctx tyT1 tyT2 &&
       let ctx' = addbinding ctx x (VarBind(tyT1))
       in kindeqv ctx' kiK1 kiK2
-  | _ -> false
+  | _ -> false *)
 
-and tyeqv ctx ty1 ty2 = 
-  (* let () = (pr "tyeqv\nty1: "; debugType ctx ty1; pr"\nty2: "; debugType ctx ty2; pr"\n") in *)
-  match (ty1, ty2) with
-    (TyBool, TyBool) -> true
-  | (TyNat, TyNat) -> true
-  | (TyVar(x1,_), TyVar(x2,_)) -> x1 = x2
-  | (TyPi(x, tyS1, tyS2), TyPi(_, tyT1, tyT2)) ->
-      tyeqv ctx tyS1 tyT1 &&
-      let ctx' = addbinding ctx x (VarBind(tyS1)) 
-      in tyeqv ctx' tyS2 tyT2
-  | (TyApp(tyS1, t1), TyApp(tyS2, t2)) -> 
-      tyeqv ctx tyS1 tyS2 && 
-      (* let () = pr"TyApp tmeqv: ";pr (string_of_bool (tmeqv ctx t1 t2));pr"\n" in *)
-      tmeqv ctx t1 t2
-  | (TySigma(x, tyS1, tyS2), TySigma(_, tyT1, tyT2)) ->
-      (* let () = pr x; pr " "; pr y; pr "\n" in *)
-      tyeqv ctx tyS1 tyT1 &&
-      let ctx' = addbinding ctx x (VarBind(tyS1)) 
-      in tyeqv ctx' tyS2 tyT2
-  | (TyVector(n1), TyVector(n2)) ->
-      tmeqv ctx n1 n2
-  | _ -> false
+and tyeqv ctx ty1 ty2 = tyeqvFix ctx ty1 ty2 (-1)
   
-and tmeqv ctx tm1 tm2 = 
-    (* let () = (pr "tmeqv\ntm1: "; debugTerm ctx tm1; pr"\ntm2: "; debugTerm ctx tm2; pr"\n") in *)
-    if tm1 = tm2 then true (* NOTE: This is a trick. For there are some bugs that the tmeqv will never halt. *)
-    else 
-    let v1 = eval ctx tm1 in
-    let v2 = eval ctx tm2 in
-    (* let () = (pr "tmeqv v "; debugTerm ctx v1; pr" "; debugTerm ctx v2; pr"\n"; pr (string_of_bool (v1 = v2)); pr"\n") in *)
-    if natcheck ctx v1 && natcheck ctx v2 then
-      nateqv ctx v1 v2
-    else match (v1, v2) with
-        (TmTrue, TmTrue) -> true
-      | (TmFalse, TmFalse) -> true
-      | (TmIf(t1, t2, t3), TmIf(s1, s2, s3)) -> 
-          tmeqv ctx t1 s1 && tmeqv ctx t2 s2 && tmeqv ctx t3 s3
-      | (TmZero, TmZero) -> true
-      | (TmSucc(t1), TmSucc(s1)) -> tmeqv ctx t1 s1
-      | (TmPred(t1), TmPred(s1)) -> tmeqv ctx t1 s1
-      | (TmIsZero(t1), TmIsZero(s1)) -> tmeqv ctx t1 s1
-      | (TmNil, TmNil) -> true
-      | (TmCons(t1, t2, t3), TmCons(s1, s2, s3)) -> 
-          tmeqv ctx t1 s1 && tmeqv ctx t2 s2 && tmeqv ctx t3 s3
-      | (TmIsNil(t1, t2), TmIsNil(s1,s2)) -> 
-          tmeqv ctx t1 s1 && tmeqv ctx t2 s2
-      | (TmHead(t1, t2), TmHead(s1,s2)) -> 
-          tmeqv ctx t1 s1 && tmeqv ctx t2 s2
-      | (TmTail(t1, t2), TmTail(s1,s2)) -> 
-          tmeqv ctx t1 s1 && tmeqv ctx t2 s2
-      | (TmApp(t1, t2), TmApp(s1,s2)) -> 
-          tmeqv ctx t1 s1 && tmeqv ctx t2 s2
-      | (TmAbs(_, tyT1, t2), TmAbs(_, tyS1, s2)) ->
-          tyeqv ctx tyT1 tyS1 && tmeqv ctx t2 s2
-      | (TmVar(x1, _), TmVar(x2, _)) -> x1 = x2
-      | (TmPair(t1, t2, tyT), TmPair(s1, s2, tyS)) ->
-          tmeqv ctx t1 s1 && tmeqv ctx t2 s2 && tyeqv ctx tyT tyS 
-      | (TmProj1(t1), TmProj1(t2)) ->
-          tmeqv ctx t1 t2
-      | (TmProj2(t1), TmProj2(t2)) ->
-          tmeqv ctx t1 t2
-      | _ -> v1 = v2
-
-  (* NOTE: Fix后缀的是为了处理fix时lambda f:ty1.ty2的ty1和ty2比较，ty2中会多绑定一个变量(递归函数f)的情况
-    TxVar中>=c的都会调整一下（前一个+1）来比较
-    其实一般来说f就是ctx中的第一个变量了，所以ty1和ty2中不会有>=c的TxVar存在，用不用这个无所谓
-    手动在ctx里加了些全局绑定并使用了才会需要这个 *)
+and tmeqv ctx tm1 tm2 = tmeqvFix ctx tm1 tm2 (-1)
 
 and natcheck ctx t = 
   match t with
@@ -324,16 +269,19 @@ and nateqv ctx t1 t2 =
     (* (debugTerm ctx t1; pr" "; debugTerm ctx t2; pr"\n"; error "[nateqv error] nat not comparable") *)
   else c1 = c2
 
-  (* NOTE: nateqv还么有加到Fix的里面。等着把这两个合并吧 *)
+(* NOTE: Fix后缀的版本是为了处理fix时lambda f:ty1.ty2的ty1和ty2比较，ty2中会多绑定一个变量(递归函数f)的情况
+  TxVar中>=c的都会调整一下（前一个+1）来比较 *)
 
 and tmeqvFix ctx tm1 tm2 c =    
-    if tm1 = tm2 then true (* NOTE:This is a trick. For there are some bugs that the tmeqv will never halt. *)
+    (* let () = (pr "tmeqv\ntm1: "; debugTerm ctx tm1; pr"\ntm2: "; debugTerm ctx tm2; pr"\n") in *)
+    if tm1 = tm2 then true 
+    (* NOTE:This is a trick. For there are some bugs that the tmeqv will never halt. *)
     else 
-    (* let () = (pr "tmeqv tm "; debugTerm ctx tm1; pr" "; debugTerm ctx tm2; pr"\n") in *)
     let v1 = eval ctx tm1 in
     let v2 = eval ctx tm2 in
-    (* let () = (pr "tmeqv v "; debugTerm ctx v1; pr" "; debugTerm ctx v2; pr"\n"; pr (string_of_bool (v1 = v2)); pr"\n") in *)
-    match (v1, v2) with
+    if natcheck ctx v1 && natcheck ctx v2 then
+      nateqv ctx v1 v2
+    else match (v1, v2) with
         (TmTrue, TmTrue) -> true
       | (TmFalse, TmFalse) -> true
       | (TmIf(t1, t2, t3), TmIf(s1, s2, s3)) -> 
@@ -366,11 +314,13 @@ and tmeqvFix ctx tm1 tm2 c =
 
   
 and tyeqvFix ctx ty1 ty2 c = 
-    (* let () = printctx ctx;pr " "; debugType ctx ty1; pr" "; debugType ctx ty2; pr"\n" in *)
+    (* let () = (pr "tyeqv\nty1: "; debugType ctx ty1; pr"\nty2: "; debugType ctx ty2; pr"\n") in *)
     match (ty1, ty2) with 
     (TyBool, TyBool) -> true
   | (TyNat, TyNat) -> true
-  | (TyVar(x1,_), TyVar(x2,_)) -> if x1>=c then x1+1 = x2 else x1 = x2
+  | (TyVar(x1,_), TyVar(x2,_)) -> 
+      if c = -1 then x1 = x2 
+      else if x1>=c then x1+1 = x2 else x1 = x2
   (* ty2比ty1的ctx多了一个变量绑定，但是用的ctx是ty1的 *)
   | (TyPi(x, tyS1, tyS2), TyPi(_, tyT1, tyT2)) ->
       tyeqvFix ctx tyS1 tyT1 c &&

@@ -23,7 +23,7 @@ and term =
   | TmIsZero of term
   | TmFix of term
   | TmNil
-  | TmCons of term * term * term (* n,x,v *)
+  | TmCons of term * term * term 
   | TmIsNil of term * term
   | TmHead of term * term
   | TmTail of term * term
@@ -37,7 +37,7 @@ and kind =
   | KiPi of string * ty * kind
 
 type binding =
-    NameBind               (* 只是占位 *)
+    NameBind               
   | VarBind of ty
   | TyVarBind of kind
 
