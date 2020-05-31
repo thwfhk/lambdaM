@@ -185,7 +185,7 @@ let rec type_of isless ctx mctx t =
         None -> error "[typeof< error: TmFunApp] metric not found"
       | Some(me0') ->
           if metricless ctx mctx me me0' then res
-          else error "[typeof< error: TmFunApp] metric doesn't descent")
+          else (error "[typeof< error: TmFunApp] metric doesn't descent; The function may not terminate."))
 
   | TmNil -> TyVector(TmZero)
   | TmCons(n, t1, t2) ->

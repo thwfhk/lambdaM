@@ -71,7 +71,7 @@ let derivedformTmFunApp s t me =
 
 (* comparison of metrics  *)
 
-let metricless_lexicographical ctx mctx me me0 =
+let metricless_normal ctx mctx me me0 =
   if List.length me != List.length me0 
     then error "[metricless error] metric length not equal"
   else 
@@ -84,11 +84,18 @@ let metricless_lexicographical ctx mctx me me0 =
     in 
     let (x1, c1) = calc m1 0 in
     let (x2, c2) = calc m2 0 in
-    if x1 != x2 then false
-    else c1 < c2
-  in let res = List.map single_metricless (List.combine me me0) 
+    if x1 != x2 then -1
+    else if c1 > c2 then -1
+    else if c1 == c2 then 0
+    else 1
+  in let res = List.map single_metricless (List.combine me me0) in
   (* in let () = pr (string_of_bool (List.hd res)); pr" ";pr (string_of_bool (List.hd (List.tl res))); pr"\n"  *)
-  in List.fold_left (||) false res
+  let qwq x y = 
+    if (x == -1 || y == -1) then -1 
+    else if(x == 1 || y == 1) then 1
+    else 0
+  in let ans = List.fold_left qwq 0 res in
+  if ans == 1 then true else false
 
 let metricless_sum ctx mctx me me0 =
   if List.length me != List.length me0 

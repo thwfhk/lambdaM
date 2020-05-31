@@ -115,6 +115,7 @@ let sum =
     )
   )
 
+
 (* a wrong version of sum which loops forever *)
 let sumR = 
   TmFun(
@@ -132,7 +133,7 @@ let sumR =
           ),
           TmApp(
             TmFunApp("sumR", TmVar(2, 3+ctxlen), [TmSucc(TmVar(1, 3+ctxlen))]),
-            TmTail(TmVar(1, 3+ctxlen), TmVar(0, 3+ctxlen))
+            TmCons(TmVar(1, 3+ctxlen), one, TmVar(0, 3+ctxlen))
           )
         )
       )
